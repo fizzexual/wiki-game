@@ -79,6 +79,26 @@
         </div>
       </div>
       <iframe id="article-frame" title="Wikipedia article"></iframe>
+
+      <div id="game-loading" class="game-loading" hidden>
+        <svg class="loader-graphic" viewBox="0 0 240 60" width="240" height="60" aria-hidden="true">
+          <line x1="30" y1="30" x2="210" y2="30" class="loader-line"/>
+          <line x1="30" y1="30" x2="210" y2="30" class="loader-dash"/>
+          <circle cx="30"  cy="30" r="9" class="loader-node start"/>
+          <circle cx="210" cy="30" r="9" class="loader-node end"/>
+          <circle r="4" class="loader-traveler">
+            <animateMotion dur="1.6s" repeatCount="indefinite"
+                           path="M 30 30 L 210 30" calcMode="spline"
+                           keySplines="0.4 0 0.2 1" keyTimes="0;1"/>
+          </circle>
+        </svg>
+        <div class="loader-pair" id="loader-pair" hidden>
+          <span id="loader-start">…</span>
+          <span class="arrow">→</span>
+          <span id="loader-end">…</span>
+        </div>
+        <div class="loader-status" id="loader-status">Picking your challenge…</div>
+      </div>
     </div>
   </section>
 

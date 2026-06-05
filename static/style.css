@@ -262,6 +262,7 @@ button.small { padding: 5px 10px; font-size: 13px; }
 
 /* ---------- Browser chrome ---------- */
 .browser {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -331,6 +332,79 @@ iframe#article-frame {
   width: 100%;
   background: #fff;
   min-height: 0;
+}
+
+/* ---------- Loading overlay ---------- */
+.game-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  opacity: 1;
+  transition: opacity .35s ease;
+}
+.game-loading[hidden] { display: none !important; }
+.game-loading.fading-out { opacity: 0; pointer-events: none; }
+
+.loader-graphic {
+  display: block;
+  overflow: visible;
+}
+.loader-line {
+  stroke: var(--border);
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
+}
+.loader-dash {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 4 10;
+  fill: none;
+  animation: loader-dash-flow 1.4s linear infinite;
+  opacity: .55;
+}
+.loader-node {
+  fill: var(--accent);
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: loader-node-pulse 1.6s ease-in-out infinite;
+}
+.loader-node.end { animation-delay: .8s; }
+.loader-traveler {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 8px var(--accent));
+}
+@keyframes loader-dash-flow {
+  to { stroke-dashoffset: -28; }
+}
+@keyframes loader-node-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%      { transform: scale(0.72); opacity: 0.5; }
+}
+
+.loader-pair {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  max-width: 80%;
+  text-align: center;
+}
+.loader-pair[hidden] { display: none; }
+.loader-pair .arrow { color: var(--muted); font-weight: 400; }
+.loader-status {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 /* ---------- End screen ---------- */

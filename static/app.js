@@ -200,6 +200,46 @@
     chromeUrl.textContent = "en.wikipedia.org/wiki/" + title.replace(/ /g, "_");
   }
 
+  // ---------- loading overlay ----------
+  function showLoader(status) {
+    const loader = document.getElementById("game-loading");
+    loader.classList.remove("fading-out");
+    loader.hidden = false;
+    document.getElementById("loader-status").textContent = status || "Loading…";
+    document.getElementById("loader-pair").hidden = true;
+  }
+  function setLoaderPair(start, end) {
+    document.getElementById("loader-start").textContent = start;
+    document.getElementById("loader-end").textContent = end;
+    document.getElementById("loader-pair").hidden = false;
+  }
+  function setLoaderStatus(text) {
+    document.getElementById("loader-status").textContent = text;
+  }
+  function hideLoader() {
+    const loader = document.getElementById("game-loading");
+    loader.classList.add("fading-out");
+    setTimeout(() => {
+      loader.hidden = true;
+      loader.classList.remove("fading-out");
+    }, 350);
+  }
+
+  function startTimer() {
+    if (timerId) clearInterval(timerId);
+    timerId = setInterval(() => {
+      if (!state || state.finished || !state.startedAt) return;
+      if (state.deadline) {
+        const remain = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
+        hudTimer.textContent = fmtTime(remain);
+        if (remain === 0) endGame(false);
+      } else {
+        const sec = Math.floor((Date.now() - state.startedAt) / 1000);
+        hudTimer.textContent = fmtTime(sec);
+      }
+    }, 500);
+  }
+
   // ---------- screens ----------
   function show(screen) {
     [intro, game, endScreen].forEach(s => { s.hidden = s !== screen; });
@@ -211,8 +251,8 @@
     show(game);
     hudStart.textContent = "…";
     hudEnd.textContent = "…";
-    hudClicks.textContent = settings.maxClicks > 0 ? `0 / ${settings.maxClicks}` : "0";
-    hudTimer.textContent = settings.timeLimit > 0 ? fmtTime(settings.timeLimit) : "0:00";
+    hudClicks.textContent = "—";
+    hudTimer.textContent = "—";
     chromeUrl.textContent = "loading…";
     frame.src = "about:blank";
     backBtn.disabled = true;
@@ -220,14 +260,16 @@
     giveUpBtn.hidden = true;
     reloadBtn.classList.add("spinning");
     if (precomputePollId) { clearInterval(precomputePollId); precomputePollId = null; }
+    if (timerId) { clearInterval(timerId); timerId = null; }
+
+    showLoader("Picking your challenge…");
 
     let pair;
     try {
       const r = await fetch("/api/random-pair?" + buildPairQuery(settings));
       pair = await r.json();
     } catch {
-      alert("Couldn't reach the server. Is it running?");
-      show(intro);
+      setLoaderStatus("Couldn't reach the server.");
       return;
     }
 
@@ -236,27 +278,20 @@
       end: pair.end,
       endNorm: normalizeTitle(pair.end),
       path: [],
-      startedAt: Date.now(),
+      startedAt: null,           // set when first article loads
       finished: false,
       settings: settings,
-      deadline: settings.timeLimit > 0 ? Date.now() + settings.timeLimit * 1000 : null,
+      deadline: null,            // set when first article loads
+      firstLoadDone: false,
     };
 
     hudStart.textContent = pair.start;
     hudEnd.textContent = pair.end;
+    setLoaderPair(pair.start, pair.end);
+    setLoaderStatus(`Loading ${pair.start}…`);
 
-    if (timerId) clearInterval(timerId);
-    timerId = setInterval(() => {
-      if (!state || state.finished) return;
-      if (state.deadline) {
-        const remain = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
-        hudTimer.textContent = fmtTime(remain);
-        if (remain === 0) endGame(false);
-      } else {
-        const sec = Math.floor((Date.now() - state.startedAt) / 1000);
-        hudTimer.textContent = fmtTime(sec);
-      }
-    }, 500);
+    // Timer is started by the iframe-load handler once the start article
+    // actually renders — see the `load` listener at the bottom of this file.
 
     // background BFS so the optimal reveal is instant at the end
     fetch("/api/precompute", {
@@ -433,6 +468,23 @@
       return;
     }
     if (pathname === "/" || pathname === "about:blank") return;
+
+    // First successful article load → hide the loader and start the clock.
+    if (!state.firstLoadDone) {
+      state.firstLoadDone = true;
+      state.startedAt = Date.now();
+      if (state.settings.timeLimit > 0) {
+        state.deadline = state.startedAt + state.settings.timeLimit * 1000;
+        hudTimer.textContent = fmtTime(state.settings.timeLimit);
+      } else {
+        hudTimer.textContent = "0:00";
+      }
+      hudClicks.textContent = state.settings.maxClicks > 0
+        ? `0 / ${state.settings.maxClicks}`
+        : "0";
+      startTimer();
+      hideLoader();
+    }
 
     if (state.suppressNextRecord) {
       state.suppressNextRecord = false;
