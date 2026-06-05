@@ -626,10 +626,104 @@ iframe#article-frame {
   margin-top: 22px;
 }
 
+/* ---------- Intro action row ---------- */
+.intro-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- Challenges modal ---------- */
+.challenge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.challenge-item {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.challenge-item:hover { border-color: var(--accent); }
+.challenge-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.challenge-name { font-weight: 600; font-size: 15px; color: var(--ink); }
+.challenge-meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.challenge-desc { color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+/* ---------- Stage chain in HUD (challenge mode) ---------- */
+.stage-chain {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.stage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stage-pill.done {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border);
+  opacity: .75;
+}
+.stage-pill.current {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.stage-pill.locked {
+  background: var(--panel-2);
+  color: var(--muted);
+  border-style: dashed;
+}
+.stage-pill .pill-num {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  display: inline-grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+.stage-pill.current .pill-num { background: rgba(255,255,255,0.28); }
+.stage-pill.done .pill-num { background: transparent; border: 1px solid var(--border); }
+.stage-pill.locked .pill-num { background: transparent; }
+.stage-sep { color: var(--muted); font-size: 11px; }
+
 @media (max-width: 700px) {
   .paths { grid-template-columns: 1fr; }
   .hud-value { max-width: 140px; }
   .browser { margin: 0 12px 12px; }
   .modal-cats { grid-template-columns: 1fr; }
   .modal-row { grid-template-columns: 1fr; }
+  .stage-pill { max-width: 110px; font-size: 11px; }
 }

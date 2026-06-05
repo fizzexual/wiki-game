@@ -1,11 +1,15 @@
 """Flask server for the Wiki Game."""
 import json
+import os
 import threading
 import time
 
-from flask import Flask, Response, jsonify, render_template, request, stream_with_context, abort
+from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context, abort
 
 import wiki
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DIST = os.path.join(HERE, "frontend", "dist")
 
 app = Flask(__name__)
 
@@ -48,7 +52,20 @@ def _compute_in_background(start: str, end: str) -> None:
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    idx = os.path.join(DIST, "index.html")
+    if not os.path.exists(idx):
+        return (
+            "Frontend not built. From the project root, run:\n\n"
+            "    cd frontend && npm install && npm run build\n",
+            503,
+            {"Content-Type": "text/plain; charset=utf-8"},
+        )
+    return send_from_directory(DIST, "index.html")
+
+
+@app.get("/assets/<path:filename>")
+def assets(filename: str):
+    return send_from_directory(os.path.join(DIST, "assets"), filename)
 
 
 @app.get("/api/categories")

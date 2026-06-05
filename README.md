@@ -11,10 +11,18 @@ Telescope → Astronomy → Marathon
 
 ```bash
 pip install -r requirements.txt
+cd frontend && npm install && npm run build && cd ..
 python app.py
 ```
 
-Open http://127.0.0.1:5000. Requires Python 3.10+.
+Open http://127.0.0.1:5000. Requires Python 3.10+ and Node 18+.
+
+For frontend development with hot reload, run Flask and Vite side-by-side:
+
+```bash
+python app.py                       # backend on :5000
+cd frontend && npm run dev          # frontend on :5173 (proxies /api and /play)
+```
 
 ## How it works
 
@@ -40,4 +48,4 @@ without injecting anything into Wikipedia.
 
 ## Stack
 
-Flask · vanilla HTML / CSS / JS · Wikipedia REST + Action APIs
+Flask · React 18 + TypeScript + Vite · Wikipedia REST + Action APIs
