@@ -93,6 +93,43 @@ def random_chain():
     return jsonify({"topics": topics})
 
 
+@app.get("/api/challenge-chain")
+def challenge_chain():
+    """Unified random-chain endpoint that returns kind-specific metadata
+    alongside the topic list. Supported `kind` values:
+      - linear      : just topics (default; equivalent to /api/random-chain)
+      - mystery     : adds `clues` array (clue per target, title masked)
+      - hot-potato  : adds `anchors` + `taboos` arrays (one per stage)
+      - hub-hunter  : adds `hubs` (banned articles)
+      - reverse-bfs : same as linear (frontend reveals BFS hops upfront)
+      - split-view  : same as linear (frontend renders split layout)
+    """
+    try:
+        n = int(request.args.get("n", 5))
+    except ValueError:
+        n = 5
+    cats = request.args.getlist("category") or None
+    difficulty = request.args.get("difficulty", "medium")
+    kind = request.args.get("kind", "linear")
+
+    topics = wiki.random_chain(n=n, categories=cats, difficulty=difficulty)
+    result: dict = {"topics": topics, "kind": kind}
+
+    if kind == "mystery":
+        result["clues"] = wiki.make_clues(topics)
+    elif kind == "hot-potato":
+        anchors, taboos = wiki.make_anchors_taboos(topics)
+        result["anchors"] = anchors
+        result["taboos"] = taboos
+    elif kind == "hub-hunter":
+        # Strip any hubs that happen to be in the chain itself so the run
+        # remains winnable.
+        chain_set = set(topics)
+        result["hubs"] = [h for h in wiki.HUB_ARTICLES if h not in chain_set]
+
+    return jsonify(result)
+
+
 @app.get("/api/precompute-status")
 def precompute_status():
     start = request.args.get("start", "").strip()

@@ -42,6 +42,15 @@ export interface ChallengeRunSettings {
   allowBack: boolean;
 }
 
+/** Distinct gameplay variants. */
+export type ChallengeKind =
+  | "linear"        // standard chain (Five Topics, Marathon, Lightning…)
+  | "mystery"       // targets shown as masked clues, not titles
+  | "hot-potato"    // each stage has a must-visit anchor + must-avoid taboo
+  | "hub-hunter"    // touching any "hub" article ends the run
+  | "reverse-bfs"   // optimal hop count revealed upfront, beat or match it
+  | "split-view";   // target article visible on the right half of the screen
+
 /** A challenge as the player picks it from the menu. The actual chain of
  * topics is generated at start time so each play is a fresh random run. */
 export interface ChallengeTemplate {
@@ -49,6 +58,7 @@ export interface ChallengeTemplate {
   name: string;
   description: string;
   topicCount: number;
+  kind: ChallengeKind;
 }
 
 /** A challenge with concrete topics resolved for a single play session. */
@@ -57,6 +67,12 @@ export interface Challenge {
   name: string;
   description: string;
   topics: string[];          // sequence: visit each in order
+  kind: ChallengeKind;
+  // Kind-specific metadata. Only set for the relevant kinds.
+  clues?: string[];          // mystery: one per target (index 0 = clue for topics[1])
+  anchors?: string[];        // hot-potato: must-visit per stage
+  taboos?: string[];         // hot-potato: must-avoid per stage
+  hubs?: string[];           // hub-hunter: list of banned articles
 }
 
 export type GameMode =

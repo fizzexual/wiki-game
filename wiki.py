@@ -15,7 +15,22 @@ import requests
 
 API = "https://en.wikipedia.org/w/api.php"
 REST_HTML = "https://en.wikipedia.org/api/rest_v1/page/html/"
+REST_SUMMARY = "https://en.wikipedia.org/api/rest_v1/page/summary/"
 TOPICS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "topics.json")
+
+# Hub list used by the Hub Hunter challenge — articles that are routing
+# crutches because they're linked from almost everything. Touching any of
+# these ends the run.
+HUB_ARTICLES = [
+    "United States", "World War II", "World War I", "English language",
+    "United Kingdom", "Latin", "France", "Germany", "China",
+    "Christianity", "London", "Paris", "European Union", "United Nations",
+    "Catholic Church", "Russia", "Japan", "India", "California",
+    "New York City", "Australia", "Italy", "Greek language", "Roman Empire",
+    "Soviet Union", "Spain", "Canada", "Africa", "Europe", "Asia",
+    "Earth", "Sun", "Human", "Animal", "Plant",
+    "Bible", "Music", "Religion", "Language",
+]
 HEADERS = {"User-Agent": "WikiGame/1.0 (educational project; https://example.local)"}
 BATCH_SIZE = 50           # max titles per query
 LINKS_PER_PAGE = 500      # pllimit/lhlimit for non-bots
@@ -470,3 +485,79 @@ def fetch_article_html(title: str) -> str:
 def title_from_url_segment(seg: str) -> str:
     """Decode a URL path segment back into a Wikipedia title."""
     return unquote(seg).replace("_", " ")
+
+
+# ---------- Challenge metadata: clues, anchors, taboos ----------
+
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
+_STOPWORDS = {"the", "and", "for", "with", "from", "into", "that", "this",
+              "are", "was", "were", "has", "have", "had", "his", "her",
+              "its", "their"}
+
+
+def fetch_summary_sentence(title: str) -> str | None:
+    """Fetch the first sentence of a Wikipedia article's summary."""
+    url = REST_SUMMARY + quote(title, safe="")
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        if not r.ok:
+            return None
+        extract = (r.json().get("extract") or "").strip()
+        if not extract:
+            return None
+        parts = _SENTENCE_SPLIT.split(extract)
+        first = parts[0] if parts else extract
+        return first if len(first) > 20 else extract[:280]
+    except Exception:
+        return None
+
+
+def mask_title(title: str, text: str) -> str:
+    """Hide the title and its significant words in `text` behind blanks."""
+    if not text:
+        return text
+    blank = "_____"
+    masked = re.sub(re.escape(title), blank, text, flags=re.IGNORECASE)
+    for word in re.findall(r"[A-Za-z][A-Za-z\-']{3,}", title):
+        if word.lower() in _STOPWORDS:
+            continue
+        masked = re.sub(r"\b" + re.escape(word) + r"[a-z]*\b",
+                        blank, masked, flags=re.IGNORECASE)
+    return masked
+
+
+def make_clues(topics: list[str]) -> list[str]:
+    """Return one clue per topic from index 1 onwards (the targets)."""
+    clues: list[str] = []
+    for t in topics[1:]:
+        raw = fetch_summary_sentence(t)
+        clues.append(mask_title(t, raw) if raw else "An article on Wikipedia.")
+    return clues
+
+
+def make_anchors_taboos(topics: list[str]) -> tuple[list[str], list[str]]:
+    """For each stage transition i -> i+1, pick a (anchor, taboo) pair.
+    Anchor = random topic not in the chain, drawn from any category — gives
+    the player a forced detour. Taboo = randomly selected hub article that
+    the player must avoid touching."""
+    chain_set = set(topics)
+    candidates = [t for t in TOPICS if t not in chain_set]
+    hub_pool = [h for h in HUB_ARTICLES if h not in chain_set]
+    anchors: list[str] = []
+    taboos: list[str] = []
+    used_anchor: set[str] = set()
+    used_taboo: set[str] = set()
+    stages = max(0, len(topics) - 1)
+    for _ in range(stages):
+        if not candidates or not hub_pool:
+            break
+        anchor_choices = [c for c in candidates if c not in used_anchor] or candidates
+        anchor = random.choice(anchor_choices)
+        used_anchor.add(anchor)
+        taboo_choices = [h for h in hub_pool if h not in used_taboo] or hub_pool
+        taboo = random.choice(taboo_choices)
+        used_taboo.add(taboo)
+        anchors.append(anchor)
+        taboos.append(taboo)
+    return anchors, taboos
+
