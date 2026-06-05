@@ -1,6 +1,8 @@
 """Wikipedia API client + bidirectional BFS for the Wiki Game."""
 from __future__ import annotations
 
+import json
+import os
 import random
 import re
 import time
@@ -13,6 +15,7 @@ import requests
 
 API = "https://en.wikipedia.org/w/api.php"
 REST_HTML = "https://en.wikipedia.org/api/rest_v1/page/html/"
+TOPICS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "topics.json")
 HEADERS = {"User-Agent": "WikiGame/1.0 (educational project; https://example.local)"}
 BATCH_SIZE = 50           # max titles per query
 LINKS_PER_PAGE = 500      # pllimit/lhlimit for non-bots
@@ -254,23 +257,20 @@ def find_path(start: str, end: str) -> Iterator[dict]:
 
 # ---------- the playable game: random pairs + proxied article HTML ----------
 
-# Curated well-known topics organised by category. Random Wikipedia is mostly
-# obscure stubs which makes for frustrating gameplay; these articles are
-# recognisable and have rich link graphs.
-TOPIC_CATEGORIES: dict[str, list[str]] = {
+# Hardcoded fallback used when topics.json is missing. Run populate_topics.py
+# to regenerate a larger pool sourced from Wikipedia's Vital Articles.
+_FALLBACK_CATEGORIES: dict[str, list[str]] = {
     "People": [
         "Albert Einstein", "Isaac Newton", "Leonardo da Vinci", "Marie Curie",
         "William Shakespeare", "Mozart", "Beyoncé", "Lionel Messi", "Cleopatra",
-        "Genghis Khan", "Plato", "Charles Darwin", "Nikola Tesla", "Frida Kahlo",
+        "Genghis Khan", "Plato", "Charles Darwin", "Nikola Tesla",
         "Mahatma Gandhi", "Nelson Mandela", "Elvis Presley", "Steve Jobs",
     ],
     "Places": [
         "Mount Everest", "Tokyo", "Antarctica", "Sahara", "Amazon rainforest",
         "Eiffel Tower", "Great Wall of China", "Venice", "Iceland", "Hawaii",
     ],
-    "Food & Drink": [
-        "Pizza", "Coffee", "Chocolate", "Sushi", "Bread", "Wine",
-    ],
+    "Food & Drink": ["Pizza", "Coffee", "Chocolate", "Sushi", "Bread", "Wine"],
     "Science & Tech": [
         "Bicycle", "Black hole", "Internet", "DNA", "Penicillin", "Telescope",
         "Camera", "Lightning", "Atom", "Evolution", "Mathematics",
@@ -288,14 +288,25 @@ TOPIC_CATEGORIES: dict[str, list[str]] = {
         "World War II", "French Revolution", "Apollo 11", "Cold War",
         "Renaissance", "Industrial Revolution",
     ],
-    "Sports & Games": [
-        "Football", "Chess", "Olympic Games", "Marathon",
-    ],
-    "Space": [
-        "Sun", "Moon", "Mars", "Galaxy", "Big Bang",
-    ],
+    "Sports & Games": ["Football", "Chess", "Olympic Games", "Marathon"],
+    "Space": ["Sun", "Moon", "Mars", "Galaxy", "Big Bang"],
 }
 
+
+def _load_topic_categories() -> dict[str, list[str]]:
+    """Load topics from topics.json if present, else fall back to hardcoded."""
+    if os.path.exists(TOPICS_PATH):
+        try:
+            with open(TOPICS_PATH, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and all(isinstance(v, list) for v in data.values()):
+                return data
+        except (OSError, json.JSONDecodeError):
+            pass
+    return _FALLBACK_CATEGORIES
+
+
+TOPIC_CATEGORIES: dict[str, list[str]] = _load_topic_categories()
 TOPICS: list[str] = [t for ts in TOPIC_CATEGORIES.values() for t in ts]
 
 
