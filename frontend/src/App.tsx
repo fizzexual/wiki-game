@@ -6,7 +6,8 @@ import { ChallengesModal } from "./components/ChallengesModal";
 import { Game, type GameResult } from "./components/Game";
 import { EndScreen } from "./components/EndScreen";
 import { clearHistory, loadHistory, loadSettings, patchLatestOptimal, recordAttempt } from "./lib/storage";
-import type { AttemptRecord, Challenge, GameMode, Settings } from "./lib/types";
+import { resolveChallenge } from "./lib/challenges";
+import type { AttemptRecord, ChallengeTemplate, GameMode, Settings } from "./lib/types";
 
 type Screen = "intro" | "game" | "end";
 
@@ -42,13 +43,20 @@ export default function App() {
     setScreen("game");
   }
 
-  function pickChallenge(c: Challenge) {
-    setMode({ kind: "challenge", challenge: c });
+  async function pickChallengeTemplate(t: ChallengeTemplate) {
     setChallengesOpen(false);
-    setOptimalPath(null);
-    setOptimalStatus("");
-    setSessionKey((k) => k + 1);
-    setScreen("game");
+    try {
+      // Fetch a fresh random chain for THIS run — challenges are randomised
+      // every play, never repeat the same sequence.
+      const challenge = await resolveChallenge(t);
+      setMode({ kind: "challenge", challenge });
+      setOptimalPath(null);
+      setOptimalStatus("");
+      setSessionKey((k) => k + 1);
+      setScreen("game");
+    } catch {
+      alert("Couldn't start the challenge — server didn't return enough topics.");
+    }
   }
 
   function handleGameEnd(
@@ -161,7 +169,7 @@ export default function App() {
       <ChallengesModal
         open={challengesOpen}
         onClose={() => setChallengesOpen(false)}
-        onPick={pickChallenge}
+        onPick={pickChallengeTemplate}
       />
     </>
   );

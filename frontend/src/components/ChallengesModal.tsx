@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import { CHALLENGES } from "../lib/challenges";
-import type { Challenge } from "../lib/types";
+import { CHALLENGE_TEMPLATES } from "../lib/challenges";
+import type { ChallengeTemplate } from "../lib/types";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onPick: (c: Challenge) => void;
+  onPick: (t: ChallengeTemplate) => void;
 }
 
 export function ChallengesModal({ open, onClose, onPick }: Props) {
@@ -26,20 +26,20 @@ export function ChallengesModal({ open, onClose, onPick }: Props) {
           Multi-stage runs. Hit each target in order — the next one stays hidden until you reach it.
         </p>
         <div className="challenge-list">
-          {CHALLENGES.map((c) => (
+          {CHALLENGE_TEMPLATES.map((t) => (
             <button
-              key={c.id}
+              key={t.id}
               type="button"
               className="challenge-item"
-              onClick={() => onPick(c)}
+              onClick={() => onPick(t)}
             >
               <div className="challenge-item-head">
-                <span className="challenge-name">{c.name}</span>
+                <span className="challenge-name">{t.name}</span>
                 <span className="challenge-meta">
-                  {c.topics.length - 1} stage{c.topics.length - 1 === 1 ? "" : "s"}
+                  {t.topicCount - 1} stage{t.topicCount - 1 === 1 ? "" : "s"}
                 </span>
               </div>
-              <span className="challenge-desc">{c.description}</span>
+              <span className="challenge-desc">{t.description}</span>
             </button>
           ))}
         </div>

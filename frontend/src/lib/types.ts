@@ -34,6 +34,16 @@ export interface PrecomputeStatus {
   elapsed?: number;
 }
 
+/** A challenge as the player picks it from the menu. The actual chain of
+ * topics is generated at start time so each play is a fresh random run. */
+export interface ChallengeTemplate {
+  id: string;
+  name: string;
+  description: string;
+  topicCount: number;
+}
+
+/** A challenge with concrete topics resolved for a single play session. */
 export interface Challenge {
   id: string;
   name: string;

@@ -81,6 +81,17 @@ def random_pair():
     return jsonify({"start": a, "end": b})
 
 
+@app.get("/api/random-chain")
+def random_chain():
+    try:
+        n = int(request.args.get("n", 5))
+    except ValueError:
+        n = 5
+    cats = request.args.getlist("category") or None
+    topics = wiki.random_chain(n=n, categories=cats)
+    return jsonify({"topics": topics})
+
+
 @app.get("/api/precompute-status")
 def precompute_status():
     start = request.args.get("start", "").strip()
