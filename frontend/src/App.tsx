@@ -8,6 +8,7 @@ import { Game, type GameResult } from "./components/Game";
 import { EndScreen } from "./components/EndScreen";
 import { clearHistory, loadHistory, loadSettings, patchLatestOptimal, recordAttempt } from "./lib/storage";
 import { resolveChallenge } from "./lib/challenges";
+import { fetchOptimalChain } from "./lib/api";
 import type { AttemptRecord, ChallengeRunSettings, ChallengeTemplate, GameMode, Settings } from "./lib/types";
 
 const screenAnim = {
@@ -17,7 +18,7 @@ const screenAnim = {
   transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const },
 };
 
-type Screen = "intro" | "game" | "end";
+type Screen = "intro" | "game";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("intro");
@@ -88,8 +89,6 @@ export default function App() {
             : "Revealing the shortest path you could have taken…",
     );
 
-    // Save to history before fetching optimal
-    const challengeName = r.mode.kind === "challenge" ? r.mode.challenge.name : undefined;
     const challengeId = r.mode.kind === "challenge" ? r.mode.challenge.id : undefined;
     const rec: AttemptRecord = {
       start: r.start,
@@ -106,24 +105,45 @@ export default function App() {
     };
     recordAttempt(rec);
     refreshHistory();
-    setScreen("end");
 
-    // Stream the optimal path; patch history once it lands.
-    const cancel = optimalFetcher((status, path) => {
-      if (path) {
-        setOptimalPath(path);
-        setOptimalStatus("");
-        patchLatestOptimal(r.start, r.end, path.length - 1);
-        refreshHistory();
-      } else {
-        setOptimalStatus(status);
-      }
-    });
-    // We don't return cancel — keeping the simple effect-less flow for clarity.
-    void challengeName; void cancel;
+    if (r.mode.kind === "challenge") {
+      // Concatenate optimal paths only up to the stage the player was
+      // actually attempting at give-up. Locked future stages stay hidden.
+      const topics = r.mode.challenge.topics;
+      const throughStage = r.won
+        ? topics.length - 1
+        : Math.min((r.stagesDone ?? 0) + 1, topics.length - 1);
+      fetchOptimalChain(topics, throughStage).then((path) => {
+        if (path && path.length > 0) {
+          setOptimalPath(path);
+          setOptimalStatus("");
+          if (r.won) {
+            patchLatestOptimal(r.start, r.end, path.length - 1);
+            refreshHistory();
+          }
+        } else {
+          setOptimalStatus("Couldn't compute the optimal path.");
+        }
+      });
+    } else {
+      const cancel = optimalFetcher((status, path) => {
+        if (path) {
+          setOptimalPath(path);
+          setOptimalStatus("");
+          patchLatestOptimal(r.start, r.end, path.length - 1);
+          refreshHistory();
+        } else {
+          setOptimalStatus(status);
+        }
+      });
+      void cancel;
+    }
   }
 
   function backToMenu() {
+    setEndResult(null);
+    setOptimalPath(null);
+    setOptimalStatus("");
     setScreen("intro");
   }
 
@@ -166,25 +186,23 @@ export default function App() {
           </motion.div>
         )}
 
-        {screen === "end" && endResult && (
-          <motion.div key="end" className="screen-wrap" {...screenAnim}>
-            <EndScreen
-              won={endResult.won}
-              start={endResult.start}
-              end={endResult.end}
-              clicks={endResult.clicks}
-              elapsedSec={endResult.elapsedSec}
-              yourPath={endResult.yourPath}
-              optimalPath={optimalPath}
-              optimalStatus={optimalStatus}
-              challengeName={endResult.mode.kind === "challenge" ? endResult.mode.challenge.name : undefined}
-              stagesDone={endResult.stagesDone}
-              stagesTotal={endResult.stagesTotal}
-              onBackToMenu={backToMenu}
-            />
-          </motion.div>
-        )}
       </AnimatePresence>
+
+      <EndScreen
+        open={!!endResult}
+        won={endResult?.won ?? false}
+        start={endResult?.start ?? ""}
+        end={endResult?.end ?? ""}
+        clicks={endResult?.clicks ?? 0}
+        elapsedSec={endResult?.elapsedSec ?? 0}
+        yourPath={endResult?.yourPath ?? []}
+        optimalPath={optimalPath}
+        optimalStatus={optimalStatus}
+        challengeName={endResult?.mode.kind === "challenge" ? endResult.mode.challenge.name : undefined}
+        stagesDone={endResult?.stagesDone}
+        stagesTotal={endResult?.stagesTotal}
+        onBackToMenu={backToMenu}
+      />
 
       <SettingsModal
         open={settingsOpen}

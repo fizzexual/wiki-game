@@ -66,3 +66,39 @@ export function streamOptimalPath(
   es.onerror = () => onError && onError();
   return es;
 }
+
+/** Promise wrapper for a single-segment optimal path lookup. */
+export function fetchOptimalSegment(start: string, end: string): Promise<string[] | null> {
+  return new Promise((resolve) => {
+    const es = streamOptimalPath(
+      start,
+      end,
+      (e) => {
+        if (e.type === "result") { es.close(); resolve(e.path ?? null); }
+        else if (e.type === "error") { es.close(); resolve(null); }
+      },
+      () => { es.close(); resolve(null); },
+    );
+  });
+}
+
+/** Concatenate per-stage optimal paths for the first `throughStage` transitions
+ *  of a topic chain. Used for the end-of-game reveal so locked future stages
+ *  never surface. Boundary nodes are deduplicated between consecutive segments. */
+export async function fetchOptimalChain(
+  topics: string[],
+  throughStage: number,
+  onProgress?: (done: number, total: number) => void,
+): Promise<string[] | null> {
+  const target = Math.min(throughStage, topics.length - 1);
+  const out: string[] = [];
+  for (let i = 0; i < target; i++) {
+    onProgress?.(i, target);
+    const seg = await fetchOptimalSegment(topics[i], topics[i + 1]);
+    if (!seg || seg.length === 0) return null;
+    if (i === 0) out.push(...seg);
+    else out.push(...seg.slice(1));
+  }
+  onProgress?.(target, target);
+  return out;
+}
