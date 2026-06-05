@@ -62,7 +62,26 @@ export function Game({ mode, settings, onGameEnd }: Props) {
   const endTitle = pair?.end ?? "";
 
   // --- Setup: pick the start/end (or stage targets for challenge) once on mount.
+  // Hard reset on every mount so a fresh challenge run never inherits state
+  // from a previous attempt: stage index, path, finished flag, iframe content.
   useEffect(() => {
+    stateRef.current = {
+      finished: false,
+      suppressNextRecord: false,
+      firstLoadDone: false,
+      startedAt: 0,
+      path: [],
+      stageIdx: 0,
+    };
+    setStageIdx(0);
+    setCanBack(false);
+    setGiveUpVisible(false);
+    setHudClicks("—");
+    setHudTimer("—");
+    setLoaderHidden(false);
+    setLoaderStatus("Picking your challenge…");
+    if (frameRef.current) frameRef.current.src = "about:blank";
+
     let cancelled = false;
     (async () => {
       try {
@@ -75,7 +94,7 @@ export function Game({ mode, settings, onGameEnd }: Props) {
           pollPrecomputeUntilReady(p.start, p.end);
         } else {
           const t = mode.challenge.topics;
-          setPair({ start: t[0], end: t[1] }); // first stage
+          setPair({ start: t[0], end: t[1] }); // first stage always starts at topics[0]
           setLoaderStatus(`Loading ${t[0]}…`);
           // Fire precompute for every consecutive pair so each stage's give-up
           // unlocks as soon as that stage's BFS finishes.

@@ -18,23 +18,24 @@ interface Props {
 export function HUD({ mode, start, end, stageIdx = 0, clicks, timer, giveUpVisible, onGiveUp }: Props) {
   if (mode.kind === "challenge") {
     const topics = mode.challenge.topics;
+    // stageIdx semantics:
+    //   = number of targets already reached, starting from topics[0]
+    //   stageIdx = 0  → at Pizza,        next target is topics[1]
+    //   stageIdx = 1  → reached Marie C., next target is topics[2]
+    //   stageIdx = N-1 (last) → finished
     return (
       <header className="hud">
         <div className="stage-chain">
           {topics.map((t, i) => {
-            const isDone = i < stageIdx;
-            const isCurrent = i === stageIdx;
-            const isLocked = i > stageIdx + 1; // current target visible; further ones locked
-            const isVisibleNext = i === stageIdx + 1;
-            const cls = isCurrent
-              ? "stage-pill current"
-              : isDone
-              ? "stage-pill done"
-              : isVisibleNext
-              ? "stage-pill"
-              : isLocked
-              ? "stage-pill locked"
-              : "stage-pill";
+            const isPast    = i < stageIdx;
+            const isHere    = i === stageIdx;             // current location
+            const isTarget  = i === stageIdx + 1;          // where to go next
+            const isLocked  = i > stageIdx + 1;            // hidden future stages
+            const cls =
+              isTarget ? "stage-pill current"
+              : isPast ? "stage-pill done"
+              : isHere ? "stage-pill here"
+              : "stage-pill locked";
             const label = isLocked ? "?" : t;
             return (
               <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

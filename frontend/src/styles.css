@@ -697,9 +697,23 @@ iframe#article-frame {
 }
 .stage-pill.done {
   background: transparent;
-  color: var(--ink);
+  color: var(--muted);
   border-color: var(--border);
-  opacity: .75;
+  opacity: .65;
+}
+.stage-pill.done .pill-num {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.stage-pill.here {
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.stage-pill.here .pill-num {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .stage-pill.current {
   background: var(--accent);
