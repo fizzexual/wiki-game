@@ -51,9 +51,16 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/api/categories")
+def categories():
+    return jsonify(list(wiki.TOPIC_CATEGORIES.keys()))
+
+
 @app.get("/api/random-pair")
 def random_pair():
-    a, b = wiki.random_pair()
+    cats = request.args.getlist("category")
+    difficulty = request.args.get("difficulty", "any")
+    a, b = wiki.random_pair(categories=cats or None, difficulty=difficulty)
     return jsonify({"start": a, "end": b})
 
 

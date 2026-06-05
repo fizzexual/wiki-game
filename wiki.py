@@ -254,32 +254,78 @@ def find_path(start: str, end: str) -> Iterator[dict]:
 
 # ---------- the playable game: random pairs + proxied article HTML ----------
 
-# Curated well-known topics — random Wikipedia is mostly obscure stubs, which
-# makes for a frustrating game. These are recognisable and have rich link graphs.
-TOPICS = [
-    "Albert Einstein", "Isaac Newton", "Leonardo da Vinci", "Marie Curie",
-    "William Shakespeare", "Mozart", "Beyoncé", "Lionel Messi", "Cleopatra",
-    "Genghis Khan", "Plato", "Charles Darwin", "Nikola Tesla", "Frida Kahlo",
-    "Mahatma Gandhi", "Nelson Mandela", "Elvis Presley", "Steve Jobs",
-    "Pizza", "Coffee", "Chocolate", "Sushi", "Bread", "Wine",
-    "Mount Everest", "Tokyo", "Antarctica", "Sahara", "Amazon rainforest",
-    "Eiffel Tower", "Great Wall of China", "Venice", "Iceland", "Hawaii",
-    "Bicycle", "Volcano", "Black hole", "Internet", "DNA", "Penicillin",
-    "Telescope", "Camera", "Piano", "Lightning",
-    "Philosophy", "Quantum mechanics", "Democracy", "Capitalism", "Buddhism",
-    "Jazz", "Opera", "Ballet", "Cinema",
-    "Tiger", "Octopus", "Honey bee", "Penguin", "Elephant", "Dolphin",
-    "Tyrannosaurus", "Mushroom",
-    "World War II", "French Revolution", "Apollo 11", "Cold War",
-    "Renaissance", "Industrial Revolution",
-    "Football", "Chess", "Olympic Games", "Marathon",
-    "Sun", "Moon", "Mars", "Galaxy", "Big Bang",
-    "Python (programming language)", "Mathematics", "Atom", "Evolution",
-]
+# Curated well-known topics organised by category. Random Wikipedia is mostly
+# obscure stubs which makes for frustrating gameplay; these articles are
+# recognisable and have rich link graphs.
+TOPIC_CATEGORIES: dict[str, list[str]] = {
+    "People": [
+        "Albert Einstein", "Isaac Newton", "Leonardo da Vinci", "Marie Curie",
+        "William Shakespeare", "Mozart", "Beyoncé", "Lionel Messi", "Cleopatra",
+        "Genghis Khan", "Plato", "Charles Darwin", "Nikola Tesla", "Frida Kahlo",
+        "Mahatma Gandhi", "Nelson Mandela", "Elvis Presley", "Steve Jobs",
+    ],
+    "Places": [
+        "Mount Everest", "Tokyo", "Antarctica", "Sahara", "Amazon rainforest",
+        "Eiffel Tower", "Great Wall of China", "Venice", "Iceland", "Hawaii",
+    ],
+    "Food & Drink": [
+        "Pizza", "Coffee", "Chocolate", "Sushi", "Bread", "Wine",
+    ],
+    "Science & Tech": [
+        "Bicycle", "Black hole", "Internet", "DNA", "Penicillin", "Telescope",
+        "Camera", "Lightning", "Atom", "Evolution", "Mathematics",
+        "Python (programming language)", "Quantum mechanics",
+    ],
+    "Arts & Culture": [
+        "Piano", "Philosophy", "Jazz", "Opera", "Ballet", "Cinema",
+        "Democracy", "Capitalism", "Buddhism",
+    ],
+    "Nature & Animals": [
+        "Tiger", "Octopus", "Honey bee", "Penguin", "Elephant", "Dolphin",
+        "Tyrannosaurus", "Mushroom", "Volcano",
+    ],
+    "History": [
+        "World War II", "French Revolution", "Apollo 11", "Cold War",
+        "Renaissance", "Industrial Revolution",
+    ],
+    "Sports & Games": [
+        "Football", "Chess", "Olympic Games", "Marathon",
+    ],
+    "Space": [
+        "Sun", "Moon", "Mars", "Galaxy", "Big Bang",
+    ],
+}
+
+TOPICS: list[str] = [t for ts in TOPIC_CATEGORIES.values() for t in ts]
 
 
-def random_pair() -> tuple[str, str]:
-    a, b = random.sample(TOPICS, 2)
+def random_pair(categories: list[str] | None = None,
+                difficulty: str = "any") -> tuple[str, str]:
+    """Return a random (start, end) pair of well-known topics.
+
+    `categories` restricts the pool to the named groups (None = all).
+    `difficulty`: "easy" picks two topics from the same category, "hard" picks
+    them from two different categories, anything else picks freely.
+    """
+    cats = [c for c in (categories or list(TOPIC_CATEGORIES.keys()))
+            if c in TOPIC_CATEGORIES]
+    pool = {c: TOPIC_CATEGORIES[c] for c in cats} or TOPIC_CATEGORIES
+    flat = [t for ts in pool.values() for t in ts]
+    if len(flat) < 2:
+        return tuple(random.sample(TOPICS, 2))
+
+    if difficulty == "easy":
+        usable = [c for c, ts in pool.items() if len(ts) >= 2]
+        if usable:
+            c = random.choice(usable)
+            a, b = random.sample(pool[c], 2)
+            return a, b
+
+    if difficulty == "hard" and len(pool) >= 2:
+        c1, c2 = random.sample(list(pool.keys()), 2)
+        return random.choice(pool[c1]), random.choice(pool[c2])
+
+    a, b = random.sample(flat, 2)
     return a, b
 
 

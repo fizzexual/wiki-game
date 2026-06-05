@@ -106,6 +106,67 @@
     </div>
   </section>
 
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-dismiss="modal"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title" class="modal-title">New challenge</h2>
+
+      <section class="modal-section">
+        <div class="modal-label-row">
+          <h3 class="modal-label">Categories</h3>
+          <button type="button" class="link-btn" id="modal-cats-toggle">Toggle all</button>
+        </div>
+        <div class="modal-cats" id="modal-cats"></div>
+      </section>
+
+      <section class="modal-section modal-row">
+        <div class="modal-field">
+          <label for="modal-difficulty">Difficulty</label>
+          <select id="modal-difficulty">
+            <option value="easy">Easy — same category</option>
+            <option value="any" selected>Any pair</option>
+            <option value="hard">Hard — different categories</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label for="modal-time">Time limit</label>
+          <select id="modal-time">
+            <option value="0" selected>No limit</option>
+            <option value="60">1 minute</option>
+            <option value="120">2 minutes</option>
+            <option value="180">3 minutes</option>
+            <option value="300">5 minutes</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="modal-section modal-row">
+        <div class="modal-field">
+          <label for="modal-clicks">Max clicks</label>
+          <select id="modal-clicks">
+            <option value="0" selected>Unlimited</option>
+            <option value="5">5</option>
+            <option value="7">7</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+          </select>
+        </div>
+        <div class="modal-field modal-toggle">
+          <label>
+            <input type="checkbox" id="modal-back" checked />
+            Allow Back button
+          </label>
+        </div>
+      </section>
+
+      <div class="modal-actions">
+        <button type="button" id="modal-cancel" class="ghost" data-dismiss="modal">Cancel</button>
+        <button type="button" id="modal-start" class="primary">Start game</button>
+      </div>
+    </div>
+  </div>
+
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

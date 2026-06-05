@@ -98,6 +98,91 @@
     }[c]));
   }
 
+  // ---------- settings (localStorage) ----------
+  const SETTINGS_KEY = "wg-settings";
+  const DEFAULT_SETTINGS = {
+    categories: null,     // null = all available
+    difficulty: "any",    // easy | any | hard
+    timeLimit: 0,         // seconds; 0 = unlimited
+    maxClicks: 0,         // 0 = unlimited
+    allowBack: true,
+  };
+  let availableCategories = [];
+
+  function loadSettings() {
+    try {
+      const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+      return { ...DEFAULT_SETTINGS, ...s };
+    } catch { return { ...DEFAULT_SETTINGS }; }
+  }
+  function saveSettings(s) {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch {}
+  }
+
+  async function ensureCategories() {
+    if (availableCategories.length) return;
+    try {
+      const r = await fetch("/api/categories");
+      availableCategories = await r.json();
+    } catch { availableCategories = []; }
+  }
+
+  async function openSettingsModal() {
+    const modal = document.getElementById("settings-modal");
+    await ensureCategories();
+    const s = loadSettings();
+
+    // Categories
+    const catsEl = document.getElementById("modal-cats");
+    catsEl.innerHTML = "";
+    const selected = new Set(s.categories || availableCategories);
+    availableCategories.forEach(c => {
+      const label = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.value = c;
+      cb.checked = selected.has(c);
+      const span = document.createElement("span");
+      span.textContent = c;
+      label.appendChild(cb);
+      label.appendChild(span);
+      catsEl.appendChild(label);
+    });
+
+    document.getElementById("modal-difficulty").value = s.difficulty;
+    document.getElementById("modal-time").value = String(s.timeLimit);
+    document.getElementById("modal-clicks").value = String(s.maxClicks);
+    document.getElementById("modal-back").checked = !!s.allowBack;
+
+    modal.hidden = false;
+    document.getElementById("modal-start").focus();
+  }
+
+  function closeSettingsModal() {
+    document.getElementById("settings-modal").hidden = true;
+  }
+
+  function collectSettings() {
+    const checked = Array.from(
+      document.querySelectorAll("#modal-cats input[type='checkbox']:checked")
+    ).map(el => el.value);
+    const allChecked = checked.length === availableCategories.length;
+    return {
+      categories: (allChecked || checked.length === 0) ? null : checked,
+      difficulty: document.getElementById("modal-difficulty").value,
+      timeLimit: parseInt(document.getElementById("modal-time").value, 10) || 0,
+      maxClicks: parseInt(document.getElementById("modal-clicks").value, 10) || 0,
+      allowBack: document.getElementById("modal-back").checked,
+    };
+  }
+
+  function buildPairQuery(settings) {
+    const qs = new URLSearchParams();
+    if (settings.categories) settings.categories.forEach(c => qs.append("category", c));
+    if (settings.difficulty) qs.set("difficulty", settings.difficulty);
+    return qs.toString();
+  }
+
   function normalizeTitle(t) {
     return decodeURIComponent(t).replace(/_/g, " ").trim().toLowerCase();
   }
@@ -121,22 +206,24 @@
   }
 
   // ---------- game flow ----------
-  async function newGame() {
+  async function newGame(settings) {
+    settings = settings || loadSettings();
     show(game);
     hudStart.textContent = "…";
     hudEnd.textContent = "…";
-    hudClicks.textContent = "0";
-    hudTimer.textContent = "0:00";
+    hudClicks.textContent = settings.maxClicks > 0 ? `0 / ${settings.maxClicks}` : "0";
+    hudTimer.textContent = settings.timeLimit > 0 ? fmtTime(settings.timeLimit) : "0:00";
     chromeUrl.textContent = "loading…";
     frame.src = "about:blank";
     backBtn.disabled = true;
+    backBtn.hidden = !settings.allowBack;
     giveUpBtn.hidden = true;
     reloadBtn.classList.add("spinning");
     if (precomputePollId) { clearInterval(precomputePollId); precomputePollId = null; }
 
     let pair;
     try {
-      const r = await fetch("/api/random-pair");
+      const r = await fetch("/api/random-pair?" + buildPairQuery(settings));
       pair = await r.json();
     } catch {
       alert("Couldn't reach the server. Is it running?");
@@ -151,6 +238,8 @@
       path: [],
       startedAt: Date.now(),
       finished: false,
+      settings: settings,
+      deadline: settings.timeLimit > 0 ? Date.now() + settings.timeLimit * 1000 : null,
     };
 
     hudStart.textContent = pair.start;
@@ -159,8 +248,14 @@
     if (timerId) clearInterval(timerId);
     timerId = setInterval(() => {
       if (!state || state.finished) return;
-      const sec = Math.floor((Date.now() - state.startedAt) / 1000);
-      hudTimer.textContent = fmtTime(sec);
+      if (state.deadline) {
+        const remain = Math.max(0, Math.ceil((state.deadline - Date.now()) / 1000));
+        hudTimer.textContent = fmtTime(remain);
+        if (remain === 0) endGame(false);
+      } else {
+        const sec = Math.floor((Date.now() - state.startedAt) / 1000);
+        hudTimer.textContent = fmtTime(sec);
+      }
     }, 500);
 
     // background BFS so the optimal reveal is instant at the end
@@ -200,12 +295,18 @@
     if (last && normalizeTitle(last) === normalizeTitle(title)) return;
 
     state.path.push(title);
-    hudClicks.textContent = Math.max(0, state.path.length - 1).toString();
+    const clicks = Math.max(0, state.path.length - 1);
+    const max = state.settings && state.settings.maxClicks;
+    hudClicks.textContent = max > 0 ? `${clicks} / ${max}` : clicks.toString();
     setChromeUrl(title);
     backBtn.disabled = state.path.length < 2;
 
     if (normalizeTitle(title) === state.endNorm) {
       endGame(true);
+      return;
+    }
+    if (max > 0 && clicks >= max) {
+      endGame(false);
     }
   }
 
@@ -359,8 +460,33 @@
     renderHistory();
   }
 
+  // ---------- modal wiring ----------
+  newGameBtn.addEventListener("click", openSettingsModal);
+
+  document.getElementById("modal-start").addEventListener("click", () => {
+    const s = collectSettings();
+    saveSettings(s);
+    closeSettingsModal();
+    newGame(s);
+  });
+
+  document.querySelectorAll("[data-dismiss='modal']").forEach(el => {
+    el.addEventListener("click", closeSettingsModal);
+  });
+
+  document.getElementById("modal-cats-toggle").addEventListener("click", () => {
+    const boxes = document.querySelectorAll("#modal-cats input[type='checkbox']");
+    const allChecked = Array.from(boxes).every(b => b.checked);
+    boxes.forEach(b => { b.checked = !allChecked; });
+  });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !document.getElementById("settings-modal").hidden) {
+      closeSettingsModal();
+    }
+  });
+
   // ---------- wire up ----------
-  newGameBtn.addEventListener("click", newGame);
   playAgainBtn.addEventListener("click", backToMenu);
   backBtn.addEventListener("click", goBack);
   reloadBtn.addEventListener("click", reload);
