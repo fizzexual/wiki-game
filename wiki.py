@@ -311,21 +311,66 @@ TOPICS: list[str] = [t for ts in TOPIC_CATEGORIES.values() for t in ts]
 
 
 def random_chain(n: int = 5,
-                 categories: list[str] | None = None) -> list[str]:
-    """Return `n` distinct, random topics. Tries to draw each item from a
-    different category for variety, falling back to the global pool if a
-    category runs out of unique entries."""
+                 categories: list[str] | None = None,
+                 difficulty: str = "medium") -> list[str]:
+    """Return `n` distinct, random topics for a multi-stage run.
+
+    Difficulty changes the source pool:
+      - easy:   all topics drawn from a single category, top 20% of that
+                category's list (most prominent vital articles).
+      - medium: one topic per shuffled category (varied subject matter,
+                whole pool eligible).
+      - hard:   forced cross-category, drawing from the deeper half of
+                each category list (more obscure entries).
+    """
     n = max(2, min(n, 12))
     cats = [c for c in (categories or list(TOPIC_CATEGORIES.keys()))
             if c in TOPIC_CATEGORIES and TOPIC_CATEGORIES[c]]
     if not cats:
         cats = [c for c in TOPIC_CATEGORIES if TOPIC_CATEGORIES[c]]
 
-    random.shuffle(cats)
-    used: set[str] = set()
-    out: list[str] = []
+    if difficulty == "easy":
+        c = random.choice(cats)
+        pool = TOPIC_CATEGORIES[c]
+        top = pool[: max(n * 4, len(pool) // 5)]  # top ~20% (or at least 4·n)
+        if len(top) < n:
+            top = pool[: max(n, len(pool))]
+        picks = random.sample(top, min(n, len(top)))
+        return picks
 
-    # Round-robin through shuffled categories until we have `n` items.
+    if difficulty == "hard":
+        # Pick n different categories (with replacement if fewer than n).
+        ordered = cats[:]
+        random.shuffle(ordered)
+        if len(ordered) < n:
+            ordered = (ordered * ((n // len(ordered)) + 1))[:n]
+        else:
+            ordered = ordered[:n]
+        used: set[str] = set()
+        out: list[str] = []
+        for c in ordered:
+            pool = TOPIC_CATEGORIES[c]
+            deep = pool[len(pool) // 2:]
+            candidates = [t for t in deep if t not in used] or [t for t in pool if t not in used]
+            if not candidates:
+                continue
+            t = random.choice(candidates)
+            out.append(t)
+            used.add(t)
+        while len(out) < n:
+            remaining = [t for t in TOPICS if t not in used]
+            if not remaining:
+                break
+            t = random.choice(remaining)
+            out.append(t)
+            used.add(t)
+        random.shuffle(out)
+        return out
+
+    # medium: round-robin across shuffled categories.
+    random.shuffle(cats)
+    used = set()
+    out = []
     while len(out) < n and cats:
         progress = False
         for c in cats:
@@ -340,14 +385,10 @@ def random_chain(n: int = 5,
             progress = True
         if not progress:
             break
-
-    # Final fallback: top up from the global flat pool.
     if len(out) < n:
         remaining = [t for t in TOPICS if t not in used]
         random.shuffle(remaining)
         out.extend(remaining[: n - len(out)])
-
-    # Re-shuffle the final chain so first/last aren't biased to the same category.
     random.shuffle(out)
     return out
 

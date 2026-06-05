@@ -34,6 +34,14 @@ export interface PrecomputeStatus {
   elapsed?: number;
 }
 
+/** Per-run challenge settings collected from the modal. */
+export interface ChallengeRunSettings {
+  difficulty: "easy" | "medium" | "hard";
+  timeLimit: number;
+  maxClicks: number;
+  allowBack: boolean;
+}
+
 /** A challenge as the player picks it from the menu. The actual chain of
  * topics is generated at start time so each play is a fresh random run. */
 export interface ChallengeTemplate {

@@ -88,7 +88,8 @@ def random_chain():
     except ValueError:
         n = 5
     cats = request.args.getlist("category") or None
-    topics = wiki.random_chain(n=n, categories=cats)
+    difficulty = request.args.get("difficulty", "medium")
+    topics = wiki.random_chain(n=n, categories=cats, difficulty=difficulty)
     return jsonify({"topics": topics})
 
 

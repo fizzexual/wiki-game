@@ -17,8 +17,11 @@ export function findTemplate(id: string): ChallengeTemplate | undefined {
 /** Fetch a random topic chain from the server and bind it to a template. */
 export async function resolveChallenge(
   template: ChallengeTemplate,
+  difficulty: "easy" | "medium" | "hard" = "medium",
 ): Promise<Challenge> {
-  const r = await fetch(`/api/random-chain?n=${template.topicCount}`);
+  const r = await fetch(
+    `/api/random-chain?n=${template.topicCount}&difficulty=${difficulty}`,
+  );
   if (!r.ok) throw new Error("random-chain failed");
   const data = await r.json();
   const topics: string[] = data.topics ?? [];
@@ -30,3 +33,10 @@ export async function resolveChallenge(
     topics,
   };
 }
+
+export const DEFAULT_CHALLENGE_SETTINGS = {
+  difficulty: "medium" as const,
+  timeLimit: 0,
+  maxClicks: 0,
+  allowBack: true,
+};

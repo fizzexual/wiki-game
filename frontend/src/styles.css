@@ -69,6 +69,13 @@ body {
   min-height: 0;
   width: 100%;
 }
+.screen-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
 .screen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .screen[hidden] { display: none !important; }
 
@@ -536,18 +543,28 @@ iframe#article-frame {
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
   cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
-[data-theme="light"] .modal-backdrop { background: rgba(0, 0, 0, 0.28); }
+[data-theme="light"] .modal-backdrop { background: rgba(15, 23, 42, 0.28); }
 .modal-card {
   position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 26px 28px 22px;
+  border-radius: 14px;
+  padding: 28px 30px 24px;
   width: 100%;
-  max-width: 460px;
+  max-width: 480px;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.3);
+}
+[data-theme="light"] .modal-card {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 12px 40px rgba(15, 23, 42, 0.12);
 }
 .modal-title { margin: 0 0 18px; font-size: 18px; font-weight: 600; }
 .modal-section + .modal-section { margin-top: 16px; }
@@ -632,6 +649,106 @@ iframe#article-frame {
   gap: 10px;
   margin-top: 22px;
 }
+
+/* ---------- Step header (two-step modals) ---------- */
+.modal-step-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.step-back {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.step-back:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Segmented control ---------- */
+.seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+}
+.seg-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 8px 10px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: color .18s;
+  z-index: 1;
+}
+.seg-btn:hover:not(.active) { color: var(--ink); border-color: transparent; }
+.seg-btn.active { color: var(--accent-ink); }
+.seg-pill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  border-radius: 7px;
+  z-index: -1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+}
+.seg-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.seg-hint {
+  font-size: 10.5px;
+  opacity: .75;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- Full-row toggle ---------- */
+.row-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink);
+  transition: border-color .15s;
+}
+.row-toggle:hover { border-color: var(--accent); }
+.row-toggle input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+/* ---------- Challenge cards (motion-driven) ---------- */
+.challenge-item {
+  background: var(--panel-2);
+}
+.challenge-item:hover { background: var(--panel-2); }
 
 /* ---------- Intro action row ---------- */
 .intro-actions {

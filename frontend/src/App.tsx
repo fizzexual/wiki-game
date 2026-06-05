@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { Intro } from "./components/Intro";
 import { SettingsModal } from "./components/SettingsModal";
@@ -7,7 +8,14 @@ import { Game, type GameResult } from "./components/Game";
 import { EndScreen } from "./components/EndScreen";
 import { clearHistory, loadHistory, loadSettings, patchLatestOptimal, recordAttempt } from "./lib/storage";
 import { resolveChallenge } from "./lib/challenges";
-import type { AttemptRecord, ChallengeTemplate, GameMode, Settings } from "./lib/types";
+import type { AttemptRecord, ChallengeRunSettings, ChallengeTemplate, GameMode, Settings } from "./lib/types";
+
+const screenAnim = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit:    { opacity: 0, y: -8 },
+  transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const },
+};
 
 type Screen = "intro" | "game" | "end";
 
@@ -43,12 +51,22 @@ export default function App() {
     setScreen("game");
   }
 
-  async function pickChallengeTemplate(t: ChallengeTemplate) {
+  async function startChallenge(t: ChallengeTemplate, runSettings: ChallengeRunSettings) {
     setChallengesOpen(false);
     try {
-      // Fetch a fresh random chain for THIS run — challenges are randomised
-      // every play, never repeat the same sequence.
-      const challenge = await resolveChallenge(t);
+      const challenge = await resolveChallenge(t, runSettings.difficulty);
+      // Pipe per-run settings (time limit, click cap, back toggle) through
+      // to Game by reusing the shared Settings shape. The shared Difficulty
+      // type uses "any" for the middle option, ChallengeRunSettings uses
+      // "medium" — translate here.
+      setSettings({
+        categories: null,
+        difficulty:
+          runSettings.difficulty === "medium" ? "any" : runSettings.difficulty,
+        timeLimit: runSettings.timeLimit,
+        maxClicks: runSettings.maxClicks,
+        allowBack: runSettings.allowBack,
+      });
       setMode({ kind: "challenge", challenge });
       setOptimalPath(null);
       setOptimalStatus("");
@@ -125,40 +143,48 @@ export default function App() {
     <>
       <ThemeToggle />
 
-      {screen === "intro" && (
-        <Intro
-          history={history}
-          onStartRandom={() => setSettingsOpen(true)}
-          onOpenChallenges={() => setChallengesOpen(true)}
-          onClearHistory={() => { clearHistory(); refreshHistory(); }}
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        {screen === "intro" && (
+          <motion.div key="intro" className="screen-wrap" {...screenAnim}>
+            <Intro
+              history={history}
+              onStartRandom={() => setSettingsOpen(true)}
+              onOpenChallenges={() => setChallengesOpen(true)}
+              onClearHistory={() => { clearHistory(); refreshHistory(); }}
+            />
+          </motion.div>
+        )}
 
-      {screen === "game" && (
-        <Game
-          key={sessionKey}
-          mode={mode}
-          settings={settings}
-          onGameEnd={handleGameEnd}
-        />
-      )}
+        {screen === "game" && (
+          <motion.div key="game" className="screen-wrap" {...screenAnim}>
+            <Game
+              key={sessionKey}
+              mode={mode}
+              settings={settings}
+              onGameEnd={handleGameEnd}
+            />
+          </motion.div>
+        )}
 
-      {screen === "end" && endResult && (
-        <EndScreen
-          won={endResult.won}
-          start={endResult.start}
-          end={endResult.end}
-          clicks={endResult.clicks}
-          elapsedSec={endResult.elapsedSec}
-          yourPath={endResult.yourPath}
-          optimalPath={optimalPath}
-          optimalStatus={optimalStatus}
-          challengeName={endResult.mode.kind === "challenge" ? endResult.mode.challenge.name : undefined}
-          stagesDone={endResult.stagesDone}
-          stagesTotal={endResult.stagesTotal}
-          onBackToMenu={backToMenu}
-        />
-      )}
+        {screen === "end" && endResult && (
+          <motion.div key="end" className="screen-wrap" {...screenAnim}>
+            <EndScreen
+              won={endResult.won}
+              start={endResult.start}
+              end={endResult.end}
+              clicks={endResult.clicks}
+              elapsedSec={endResult.elapsedSec}
+              yourPath={endResult.yourPath}
+              optimalPath={optimalPath}
+              optimalStatus={optimalStatus}
+              challengeName={endResult.mode.kind === "challenge" ? endResult.mode.challenge.name : undefined}
+              stagesDone={endResult.stagesDone}
+              stagesTotal={endResult.stagesTotal}
+              onBackToMenu={backToMenu}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <SettingsModal
         open={settingsOpen}
@@ -169,7 +195,7 @@ export default function App() {
       <ChallengesModal
         open={challengesOpen}
         onClose={() => setChallengesOpen(false)}
-        onPick={pickChallengeTemplate}
+        onStart={startChallenge}
       />
     </>
   );
