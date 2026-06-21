@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  articleUrl,
   fetchOptimalSegment,
   fetchRandomPair,
   getPrecomputeStatus,
   startPrecompute,
   streamOptimalPath,
 } from "../lib/api";
-import { fmtTime, normalizeTitle, titleFromPathname } from "../lib/format";
+import { errorDoc, fetchArticleHtml } from "../lib/wiki/article";
+import { fmtTime, normalizeTitle } from "../lib/format";
 import type { GameMode, Settings } from "../lib/types";
 import { BrowserChrome } from "./BrowserChrome";
 import { HUD } from "./HUD";
@@ -41,13 +41,14 @@ export function Game({ mode, settings, onGameEnd }: Props) {
   const sideFrameRef = useRef<HTMLIFrameElement>(null);
   const stateRef = useRef({
     finished: false,
-    suppressNextRecord: false,
+    currentArticle: null as string | null,
     firstLoadDone: false,
     startedAt: 0,
     path: [] as string[],
     stageIdx: 0,
     anchorVisited: [] as boolean[],
   });
+  const loadSeqRef = useRef(0);
 
   const [pair, setPair] = useState<{ start: string; end: string } | null>(null);
   const [loaderStatus, setLoaderStatus] = useState("Picking your challenge…");
@@ -73,7 +74,7 @@ export function Game({ mode, settings, onGameEnd }: Props) {
   useEffect(() => {
     stateRef.current = {
       finished: false,
-      suppressNextRecord: false,
+      currentArticle: null,
       firstLoadDone: false,
       startedAt: 0,
       path: [],
@@ -94,8 +95,9 @@ export function Game({ mode, settings, onGameEnd }: Props) {
       isChallenge ? new Array(mode.challenge.topics.length - 1).fill(null) : [],
     );
     setHintMessage(null);
-    if (frameRef.current) frameRef.current.src = "about:blank";
-    if (sideFrameRef.current) sideFrameRef.current.src = "about:blank";
+    loadSeqRef.current++;
+    if (frameRef.current) frameRef.current.srcdoc = "";
+    if (sideFrameRef.current) sideFrameRef.current.srcdoc = "";
 
     let cancelled = false;
     (async () => {
@@ -129,10 +131,7 @@ export function Game({ mode, settings, onGameEnd }: Props) {
               });
             }
           }
-          // For split-view, mirror the target article in the side pane.
-          if (ch.kind === "split-view" && sideFrameRef.current) {
-            sideFrameRef.current.src = articleUrl(t[1]);
-          }
+          // For split-view, the side pane is loaded by the pair effect below.
         }
       } catch {
         setLoaderStatus("Couldn't reach the server.");
@@ -180,30 +179,72 @@ export function Game({ mode, settings, onGameEnd }: Props) {
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
+  // --- Article loading (client-side; no server proxy).
+  // Fetch + rewrite the article and drop it into the iframe via srcdoc. A
+  // sequence guard makes sure a slow fetch can't overwrite a newer navigation.
+  async function loadMain(title: string) {
+    const frame = frameRef.current;
+    if (!frame) return;
+    const seq = ++loadSeqRef.current;
+    stateRef.current.currentArticle = title;
+    setReloadSpinning(true);
+    let html: string;
+    try {
+      html = await fetchArticleHtml(title);
+    } catch (e) {
+      html = errorDoc("Couldn't load this article. " + (e instanceof Error ? e.message : ""));
+    }
+    if (loadSeqRef.current !== seq) return; // superseded by a newer load
+    frame.srcdoc = html;
+  }
+
+  async function renderSide(title: string) {
+    const f = sideFrameRef.current;
+    if (!f) return;
+    try {
+      f.srcdoc = await fetchArticleHtml(title);
+    } catch {
+      f.srcdoc = errorDoc("Couldn't load the target article.");
+    }
+  }
+
+  // In-article link clicks arrive here via postMessage from the injected
+  // interceptor. Use a ref so the once-registered listener always calls the
+  // latest closure (which captures the current pair / stage).
+  const navHandlerRef = useRef<(title: string) => void>(() => {});
+  navHandlerRef.current = (title: string) => {
+    recordVisit(title);
+    if (!stateRef.current.finished) void loadMain(title);
+  };
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      const d = e.data;
+      if (!d || d.source !== "wikigame" || d.type !== "navigate") return;
+      if (e.source !== frameRef.current?.contentWindow) return; // ignore side pane
+      const title = String(d.title || "");
+      if (title) navHandlerRef.current(title);
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   // --- Load the start article whenever pair changes.
   useEffect(() => {
     if (!pair) return;
     setChromeUrl("loading…");
-    setReloadSpinning(true);
-    const f = frameRef.current;
-    if (f) f.src = articleUrl(pair.start);
+    void loadMain(pair.start);
+    recordVisit(pair.start); // record the stage's starting article (deduped)
     // For split-view, keep the right pane locked to the current target.
-    if (isSplitView && sideFrameRef.current) {
-      sideFrameRef.current.src = articleUrl(pair.end);
-    }
+    if (isSplitView) void renderSide(pair.end);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pair, isSplitView]);
 
-  // --- Iframe load
+  // --- Iframe load. Visit recording now happens via postMessage / loadMain;
+  // this just clears the spinner and runs first-load setup (timer + loader).
   function onIframeLoad() {
     setReloadSpinning(false);
     if (!pair) return;
-    let pathname = "";
-    try {
-      pathname = frameRef.current?.contentWindow?.location.pathname || "";
-    } catch {
-      return;
-    }
-    if (pathname === "/" || pathname === "about:blank" || pathname === "") return;
+    if (!stateRef.current.currentArticle) return; // blank/reset load
 
     if (!stateRef.current.firstLoadDone) {
       stateRef.current.firstLoadDone = true;
@@ -216,13 +257,6 @@ export function Game({ mode, settings, onGameEnd }: Props) {
       startTimer(deadline);
       setLoaderHidden(true);
     }
-
-    if (stateRef.current.suppressNextRecord) {
-      stateRef.current.suppressNextRecord = false;
-      return;
-    }
-    const title = titleFromPathname(pathname);
-    if (title) recordVisit(title);
   }
 
   function recordVisit(title: string) {
@@ -323,20 +357,13 @@ export function Game({ mode, settings, onGameEnd }: Props) {
     const c = Math.max(0, stateRef.current.path.length - 1);
     setHudClicks(settings.maxClicks > 0 ? `${c} / ${settings.maxClicks}` : String(c));
     setChromeUrl("en.wikipedia.org/wiki/" + prev.replace(/ /g, "_"));
-    stateRef.current.suppressNextRecord = true;
-    if (frameRef.current) frameRef.current.src = articleUrl(prev);
+    void loadMain(prev); // re-render without recording a new visit
   }
 
   function reload() {
     if (stateRef.current.path.length === 0) return;
     const last = stateRef.current.path[stateRef.current.path.length - 1];
-    stateRef.current.suppressNextRecord = true;
-    setReloadSpinning(true);
-    try {
-      frameRef.current?.contentWindow?.location.reload();
-    } catch {
-      if (frameRef.current) frameRef.current.src = articleUrl(last);
-    }
+    void loadMain(last);
   }
 
   function finishGame(

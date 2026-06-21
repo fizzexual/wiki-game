@@ -11,10 +11,3 @@ export function normalizeTitle(t: string): string {
 export function wikiUrl(title: string): string {
   return "https://en.wikipedia.org/wiki/" + encodeURIComponent(title.replace(/ /g, "_"));
 }
-
-export function titleFromPathname(pathname: string): string | null {
-  if (!pathname.startsWith("/play/article/")) return null;
-  return decodeURIComponent(pathname.replace("/play/article/", ""))
-    .replace(/_/g, " ")
-    .split("#")[0];
-}

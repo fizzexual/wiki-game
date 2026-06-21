@@ -1,4 +1,6 @@
 import type { Challenge, ChallengeKind, ChallengeTemplate } from "./types";
+import { randomChain } from "./wiki/topics";
+import { hubsForChain, makeAnchorsTaboos, makeClues } from "./wiki/challengeMeta";
 
 export const CHALLENGE_TEMPLATES: ChallengeTemplate[] = [
   {
@@ -55,20 +57,12 @@ export function findTemplate(id: string): ChallengeTemplate | undefined {
   return CHALLENGE_TEMPLATES.find((t) => t.id === id);
 }
 
-/** Fetch a random topic chain + kind-specific metadata from the server. */
+/** Generate a random topic chain + kind-specific metadata, client-side. */
 export async function resolveChallenge(
   template: ChallengeTemplate,
   difficulty: "easy" | "medium" | "hard" = "medium",
 ): Promise<Challenge> {
-  const params = new URLSearchParams({
-    n: String(template.topicCount),
-    difficulty,
-    kind: template.kind,
-  });
-  const r = await fetch(`/api/challenge-chain?${params.toString()}`);
-  if (!r.ok) throw new Error("challenge-chain failed");
-  const data = await r.json();
-  const topics: string[] = data.topics ?? [];
+  const topics = randomChain(template.topicCount, null, difficulty);
   if (topics.length < 2) throw new Error("not enough topics returned");
   const challenge: Challenge = {
     id: template.id,
@@ -77,10 +71,16 @@ export async function resolveChallenge(
     topics,
     kind: template.kind,
   };
-  if (Array.isArray(data.clues))   challenge.clues   = data.clues;
-  if (Array.isArray(data.anchors)) challenge.anchors = data.anchors;
-  if (Array.isArray(data.taboos))  challenge.taboos  = data.taboos;
-  if (Array.isArray(data.hubs))    challenge.hubs    = data.hubs;
+  if (template.kind === "mystery") {
+    // Clues are fetched from Wikipedia summaries — may take a moment.
+    challenge.clues = await makeClues(topics);
+  } else if (template.kind === "hot-potato") {
+    const { anchors, taboos } = makeAnchorsTaboos(topics);
+    challenge.anchors = anchors;
+    challenge.taboos = taboos;
+  } else if (template.kind === "hub-hunter") {
+    challenge.hubs = hubsForChain(topics);
+  }
   return challenge;
 }
 
